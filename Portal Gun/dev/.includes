@@ -1,6 +1,6 @@
 portalManager.js
+particles.js
 portalConstructor.js
 item.js
 renderItems.js
-portalBallItem.js
 throwFunction.js

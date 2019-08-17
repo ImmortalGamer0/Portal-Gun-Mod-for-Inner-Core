@@ -1,20 +1,6 @@
 Array.prototype.min = function() {
   return Math.min.apply(null, this);
 };
-
-function particlesss(x,y,z){
-    this.x = x; this.y = y; this.z = z;
-    this.time = 0;
-    this.update = function(){
-        Particles.addFarParticle(7,this.x,this.y,this.z,0,.1,0);
-        
-       this.time++;
-       if(this.time>40){
-        this.remove = true;
-            World.setBlock(this.x,this.y,this.z,3);
-        }
-    }
-};
 function rotateVel(secondPortalIndex,vx,vy,vz){
     var vel = {x:vx, y:vy, z:vz};
     switch(parseInt(secondPortalIndex)){
@@ -24,22 +10,18 @@ function rotateVel(secondPortalIndex,vx,vy,vz){
         case 2: 
         vel.z = -vy;
         vel.y = vz;
-        //+z
             break;
         case 3:
         vel.z = vy;
         vel.y = vz; 
-        //-z
             break;
         case 4:
         vel.x = vy;
         vel.y = vx;
-        //-x
             break;
         case 5:
         vel.x = -vy;
         vel.y = vx;
-        //+x
             break;
     };return vel;
 };
@@ -84,7 +66,7 @@ var PortalCoordsHelper = {
 };
 function portalBall(color, x,y,z, vx,vy,vz){
     
-    this.animation = null;
+    this.emitter = null;
     this.inBlock = false;
     
     this.x = x; this.y = y; this.z = z;
@@ -111,34 +93,24 @@ function portalBall(color, x,y,z, vx,vy,vz){
     this.getRelativePortalCoords1 = function(index){
         switch(parseInt(index)){
             case BlockSide.DOWN: 
-                //alert('DOWN');
                 return [{x:-1,y:-1,z:0},{x:0,y:-1,z:0}];
             case BlockSide.UP:
-                //alert('UP');
               return [{x:0,y:1,z:0},{x:-1,y:1,z:0}];
             case BlockSide.WEST: 
-              //alert('WEST');//4
                return [{x: -1, y:0, z:0},{x: -1, y:-1, z:0}];
             case BlockSide.EAST:
-               //('EAST');//5
               return [{x:1,y:0,z:0},{x:1,y:-1,z:0}];
             case BlockSide.NORTH:
-              //alert('NORTH'); //2
                 return [{x:0,y:0,z:1},{x:0,y:-1,z:1}];
             case BlockSide.SOUTH: 
-                //alert('SOUTH'); //3
                 return [{x:0,y:0,z:-1},{x:0,y:-1,z:-1}];
         }
     }; 
-    this.hasSpaceForPortal1 = function(index,x,y,z){
+    this.hasSpaceForPortal = function(index,x,y,z){
         var relativeCoords = this.getRelativePortalCoords1(index);
         var upID = World.getBlockID(x+relativeCoords[0].x,y+relativeCoords[0].y,z+relativeCoords[0].z);
         var dwID = World.getBlockID(x+relativeCoords[1].x,y+relativeCoords[1].y,z+relativeCoords[1].z);
-        
-      //  var part1 = new particlesss(x+relativeCoords[0].x,y+relativeCoords[0].y,z+relativeCoords[0].z);        
-       // var part2 = new particlesss(x+relativeCoords[1].x,y+relativeCoords[1].y,z+relativeCoords[1].z);
-      //  Updatable.addUpdatable(part1);
-      //  UpdatableAPI.addUpdatable(part2);
+         
         if(dwID||upID)return false;
         
         return true;
@@ -146,6 +118,11 @@ function portalBall(color, x,y,z, vx,vy,vz){
     this.getTriggers = function(index,x,y,z){
         var relativeCoords = this.getRelativePortalCoords1(index);
         return [[x+relativeCoords[0].x,y+relativeCoords[0].y,z+relativeCoords[0].z],[x+relativeCoords[1].x,y+relativeCoords[1].y,z+relativeCoords[1].z]]
+    };
+    this.init = function(){
+        var part = this.color == "orange" ? particleOrange : particleBlue;
+        this.emitter = Particles.ParticleEmitter(this.x,this.y, this.z);
+        this.emitter.emit(part, 0, this.emitter.getPosition().x, this.emitter.getPosition().y, this.emitter.getPosition().z);
     };
     this.update = function(){
         this.age++;
@@ -165,37 +142,26 @@ function portalBall(color, x,y,z, vx,vy,vz){
             }  
         }
     }
-    
+     
     this.updateAnimation = function(){
-        if(this.animation) this.animation.destroy();
-        
-        var items = PortalManager.getRenderItemsForColor(this.color);
-        
-        this.animation = new Animation.Item(this.x, this.y, this.z); 
-        this.animation.describeItem({
-            id: items.ball,
-            count: 1,
-            data: 0,
-            size: 1,
-            rotation: [0, Entity.getLookAngle(Player.get()).yaw+Math.PI,0],
-            notRandomize: true
-        });
-        this.animation.load();
+        if(this.emitter){
+            this.emitter.moveTo(this.x, this.y, this.z);
+        }
     };
     
     this.OnCollisionEnter = function(side){
-        //("collised "+side);
-        if(this.hasSpaceForPortal1(side,Math.floor(this.x), Math.floor(this.y),Math.floor (this.z))){
+        if(this.hasSpaceForPortal(side,Math.floor(this.x), Math.floor(this.y),Math.floor (this.z))){
             var trigg = this.getTriggers(side,Math.floor(this.x),Math.floor(this.y),Math.floor(this.z));
             var portal = new inworldPortal(this.color,Math.floor(this.x),Math.floor(this.y),Math.floor(this.z),trigg,side);
             portal.init();
             Updatable.addUpdatable(portal);
-        }//else{alert("no space")}
+        }
         this.destroy();
     };
     this.destroy = function(){
-        if(this.animation)this.animation.destroy();
-        this.remove = true;
+        PortalManager.portalBalls[this.color] = null;
+        this.emitter.moveTo(0, -1, 0);
+        this.remove = true;  
     };
 };
 
@@ -212,11 +178,9 @@ function inworldPortal(color,x,y,z,relativeCoords,side){
     
     this.bottomAnimation = null;
     this.topAnimation = null;
-    this.sideVectors = [[0,-1,0],[0,1,0],[0,0,1],[0,0,-1],[-1,0,0],[1,0,0]];
+    this.sideVectors = [[0,-1,0],[0,1,0],[0,0,1],[0,0,-1],[-1,0,0],[1,0,0]];  
     
     this.destroy = function(){
-        //("Holy shit!!! Portal destroyed!! "+this.color);
-        //World.setBlock(this.x,this.y,this.z,3,0);
         this.close();
         
         if(this.bottomAnimation)this.bottomAnimation.destroy();
@@ -228,12 +192,10 @@ function inworldPortal(color,x,y,z,relativeCoords,side){
     this.open = function(){
         this.opened = true;
         this.initAnimation();
-        //("portal opened "+this.color);
     };
     this.close = function(){
         this.opened = false;
         this.initAnimation();
-        //alert("portal closed "+this.color);
     };
     this.getEntity = function(ent){};
     this.update = function(){
@@ -252,7 +214,6 @@ function inworldPortal(color,x,y,z,relativeCoords,side){
                     var pl = Entity.getPosition(Player.get());
                     var vel = Entity.getVelocity(Player.get());
                     for(var a = -1;a<1;a++){
-                        //alert("checking "+a);
                         var coords = [Math.floor( pl.x+vel.x),Math.floor(pl.y+vel.y)+a,Math.floor(pl.z+vel.z)];
                         Particles.addFarParticle(7,coords.x,coords.y,coords.z,0,.1,0);
                         if(this.compareCoords(trig,coords)){
@@ -266,7 +227,6 @@ function inworldPortal(color,x,y,z,relativeCoords,side){
                             //TELEPORTING
                             Entity.setPosition(Player.get(),newCoords[0],newCoords[1]+1,newCoords[2]);
                             if(this.side==1){
-                                //alert("ХОБА!");
                                 var newVel = rotateVel(pSide,vel.x,vel.y,vel.z);
                                 Entity.setVelocity(Player.get(),newVel.x,newVel.y,newVel.z);
                             }else{
@@ -293,7 +253,6 @@ function inworldPortal(color,x,y,z,relativeCoords,side){
         PortalManager.setPortal(this.color,this);
     };
     this.initAnimation = function(){
-        //("anim");
         var items = PortalManager.getRenderItemsForColor(this.color);
         var bottomItem = this.opened ? items.bottomOpened : items.bottomClosed;
         var topItem = this.opened ? items.topOpen : items.topClosed;
